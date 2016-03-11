@@ -1,11 +1,11 @@
 # MySQL address, user and password
 # user must have replication privilege in MySQL.
-my_addr = "127.0.0.1:3306"
-my_user = "root"
-my_pass = ""
+my_addr = "rds55mr0852wdvp1k74go.mysql.rds.aliyuncs.com:3306"
+my_user = "mtty"
+my_pass = "Mttycom123"
 
 # Elasticsearch address
-es_addr = "127.0.0.1:9200"
+es_addr = "123.56.15.234:9200"
 
 # Path to store data, like master.info, and dump MySQL data 
 data_dir = "./var"
@@ -14,7 +14,7 @@ data_dir = "./var"
 stat_addr = "127.0.0.1:12800"
 
 # pseudo server id like a slave 
-server_id = 1001
+server_id = 1
 
 # mysql or mariadb
 flavor = "mysql"
@@ -23,40 +23,71 @@ flavor = "mysql"
 mysqldump = "mysqldump"
 
 # MySQL data source
-[[source]]
-schema = "test"
+#[[source]]
+#schema = "test"
 
 # Only below tables will be synced into Elasticsearch.
 # "test_river_[0-9]{4}" is a wildcard table format, you can use it if you have many sub tables, like table_0000 - table_1023
 # I don't think it is necessary to sync all tables in a database.
-tables = ["test_river", "test_river_[0-9]{4}"]
+#tables = ["test_river", "test_river_[0-9]{4}"]
 
 # Below is for special rule mapping
-[[rule]]
-schema = "test"
-table = "test_river"
-index = "river"
-type = "river"
+#[[rule]]
+#schema = "test"
+#table = "test_river"
+#index = "river"
+#type = "river"
 
     # title is MySQL test_river field name, es_title is the customized name in Elasticsearch
-    [rule.field]
+    #[rule.field]
     # This will map column title to elastic search my_title
-    title="es_title"
+    #title="es_title"
     # This will map column tags to elastic search my_tags and use array type
-    tags="my_tags,list"
+    #tags="my_tags,list"
     # This will map column keywords to elastic search keywords and use array type
-    keywords=",list"
+    #keywords=",list"
 
 # wildcard table rule, the wildcard table must be in source tables 
-[[rule]]
-schema = "test"
-table = "test_river_[0-9]{4}"
-index = "river"
-type = "river"
+#[[rule]]
+#schema = "test"
+#table = "test_river_[0-9]{4}"
+#index = "river"
+#type = "river"
 
     # title is MySQL test_river field name, es_title is the customized name in Elasticsearch
-    [[rule.fields]]
-    mysql = "title"
-    elastic = "es_title"
+ #   [[rule.fields]]
+  #  mysql = "title"
+   # elastic = "es_title"
+
+# new mtty solution index mapping,elasticsearch index mappings should be set before hand
+[[source]]
+schema = "new_mtty"
+tables = ["solution","banner","media_adplace"]
+
+
+[[rule]]
+schema = "new_mtty"
+table = "solution"
+index = "solutions"
+type = "solution"
+parent = "bgid"
+idfmt = "1%06s"
+
+[[rule]]
+schema = "new_mtty"
+table = "banner"
+index = "solutions"
+type = "banner"
+parent = "bgid"
+idfmt = "5%06s"
+
+[[rule]]
+schema = "new_mtty"
+table = "media_adplace"
+index = "solutions"
+type = "banner"
+parent = "d_media"
+
+
 
 

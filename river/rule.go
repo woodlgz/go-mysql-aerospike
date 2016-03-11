@@ -1,7 +1,7 @@
 package river
 
 import (
-	"github.com/siddontang/go-mysql/schema"
+	"../go-mysql/schema"
 )
 
 // If you want to sync MySQL data into elasticsearch, you must set a rule to let use know how to do it.
@@ -13,6 +13,8 @@ type Rule struct {
 	Index  string `toml:"index"`
 	Type   string `toml:"type"`
 	Parent string `toml:"parent"`
+	IdFmt  string `toml:"idfmt"`
+	ParentFmt string `toml:"parentfmt"`
 
 	// Default, a MySQL table field name is mapped to Elasticsearch field name.
 	// Sometimes, you want to use different name, e.g, the MySQL file name is title,

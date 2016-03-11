@@ -6,7 +6,7 @@ import (
 	"sync"
 
 	"github.com/juju/errors"
-	"github.com/siddontang/go-mysql/canal"
+	"../go-mysql/canal"
 
 	"github.com/siddontang/go-mysql-elasticsearch/elastic"
 	"github.com/siddontang/go/log"
@@ -52,7 +52,7 @@ func NewRiver(c *Config) (*River, error) {
 		return nil, errors.Trace(err)
 	}
 
-	// We must use binlog full row image
+	// We must use binlog full row image¬
 	if err = r.canal.CheckBinlogRowImage("FULL"); err != nil {
 		return nil, errors.Trace(err)
 	}

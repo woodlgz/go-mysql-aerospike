@@ -8,8 +8,8 @@ import (
 
 	"github.com/juju/errors"
 	"github.com/siddontang/go-mysql-elasticsearch/elastic"
-	"github.com/siddontang/go-mysql/canal"
-	"github.com/siddontang/go-mysql/schema"
+	"../go-mysql/canal"
+	"../go-mysql/schema"
 	"github.com/siddontang/go/log"
 )
 
@@ -32,7 +32,6 @@ func (h *rowsEventHandler) Do(e *canal.RowsEvent) error {
 	if !ok {
 		return nil
 	}
-
 	var reqs []*elastic.BulkRequest
 	var err error
 	switch e.Action {
@@ -65,18 +64,22 @@ func (h *rowsEventHandler) String() string {
 // for insert and delete
 func (r *River) makeRequest(rule *Rule, action string, rows [][]interface{}) ([]*elastic.BulkRequest, error) {
 	reqs := make([]*elastic.BulkRequest, 0, len(rows))
-
 	for _, values := range rows {
 		id, err := r.getDocID(rule, values)
 		if err != nil {
 			return nil, errors.Trace(err)
 		}
-
+		if len(rule.IdFmt) > 0 {
+			id = fmt.Sprintf(rule.IdFmt,id)
+		}
 		parentID := ""
 		if len(rule.Parent) > 0 {
 			if parentID, err = r.getParentID(rule, values, rule.Parent); err != nil {
 				return nil, errors.Trace(err)
 			}
+		}
+		if len(rule.ParentFmt) > 0 {
+			parentID = fmt.Sprintf(rule.ParentFmt,parentID)
 		}
 
 		req := &elastic.BulkRequest{Index: rule.Index, Type: rule.Type, ID: id, Parent: parentID}

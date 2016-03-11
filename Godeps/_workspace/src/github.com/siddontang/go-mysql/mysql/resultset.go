@@ -1,11 +1,9 @@
 package mysql
 
 import (
-	"encoding/binary"
-	"fmt"
-	"math"
 	"strconv"
 
+	"github.com/juju/errors"
 	"github.com/siddontang/go/hack"
 )
 
@@ -24,14 +22,14 @@ func (p RowData) ParseText(f []*Field) ([]interface{}, error) {
 
 	var err error
 	var v []byte
-	var isNull, isUnsigned bool
+	var isNull bool
 	var pos int = 0
 	var n int = 0
 
 	for i := range f {
 		v, isNull, n, err = LengthEnodedString(p[pos:])
 		if err != nil {
-			return nil, err
+			return nil, errors.Trace(err)
 		}
 
 		pos += n
@@ -39,7 +37,7 @@ func (p RowData) ParseText(f []*Field) ([]interface{}, error) {
 		if isNull {
 			data[i] = nil
 		} else {
-			isUnsigned = (f[i].Flag&UNSIGNED_FLAG > 0)
+			isUnsigned := f[i].Flag&UNSIGNED_FLAG != 0
 
 			switch f[i].Type {
 			case MYSQL_TYPE_TINY, MYSQL_TYPE_SHORT, MYSQL_TYPE_INT24,
@@ -56,7 +54,7 @@ func (p RowData) ParseText(f []*Field) ([]interface{}, error) {
 			}
 
 			if err != nil {
-				return nil, err
+				return nil, errors.Trace(err)
 			}
 		}
 	}
@@ -75,7 +73,6 @@ func (p RowData) ParseBinary(f []*Field) ([]interface{}, error) {
 
 	nullBitmap := p[1:pos]
 
-	var isUnsigned bool
 	var isNull bool
 	var n int
 	var err error
@@ -86,7 +83,7 @@ func (p RowData) ParseBinary(f []*Field) ([]interface{}, error) {
 			continue
 		}
 
-		isUnsigned = f[i].Flag&UNSIGNED_FLAG > 0
+		isUnsigned := f[i].Flag&UNSIGNED_FLAG != 0
 
 		switch f[i].Type {
 		case MYSQL_TYPE_NULL:
@@ -95,47 +92,56 @@ func (p RowData) ParseBinary(f []*Field) ([]interface{}, error) {
 
 		case MYSQL_TYPE_TINY:
 			if isUnsigned {
-				data[i] = uint64(p[pos])
+				data[i] = ParseBinaryUint8(p[pos : pos+1])
 			} else {
-				data[i] = int64(p[pos])
+				data[i] = ParseBinaryInt8(p[pos : pos+1])
 			}
 			pos++
 			continue
 
 		case MYSQL_TYPE_SHORT, MYSQL_TYPE_YEAR:
 			if isUnsigned {
-				data[i] = uint64(binary.LittleEndian.Uint16(p[pos : pos+2]))
+				data[i] = ParseBinaryUint16(p[pos : pos+2])
 			} else {
-				data[i] = int64((binary.LittleEndian.Uint16(p[pos : pos+2])))
+				data[i] = ParseBinaryInt16(p[pos : pos+2])
 			}
 			pos += 2
 			continue
 
-		case MYSQL_TYPE_INT24, MYSQL_TYPE_LONG:
+		case MYSQL_TYPE_INT24:
 			if isUnsigned {
-				data[i] = uint64(binary.LittleEndian.Uint32(p[pos : pos+4]))
+				data[i] = ParseBinaryUint24(p[pos : pos+3])
 			} else {
-				data[i] = int64(binary.LittleEndian.Uint32(p[pos : pos+4]))
+				data[i] = ParseBinaryInt24(p[pos : pos+3])
+			}
+			pos += 4
+			continue
+
+		case MYSQL_TYPE_LONG:
+			if isUnsigned {
+				data[i] = ParseBinaryUint32(p[pos : pos+4])
+			} else {
+				data[i] = ParseBinaryInt32(p[pos : pos+4])
 			}
 			pos += 4
 			continue
 
 		case MYSQL_TYPE_LONGLONG:
 			if isUnsigned {
-				data[i] = binary.LittleEndian.Uint64(p[pos : pos+8])
+				data[i] = ParseBinaryUint64(p[pos : pos+8])
 			} else {
-				data[i] = int64(binary.LittleEndian.Uint64(p[pos : pos+8]))
+				data[i] = ParseBinaryInt64(p[pos : pos+8])
 			}
 			pos += 8
 			continue
 
 		case MYSQL_TYPE_FLOAT:
-			data[i] = float64(math.Float32frombits(binary.LittleEndian.Uint32(p[pos : pos+4])))
+			data[i] = ParseBinaryFloat32(p[pos : pos+4])
 			pos += 4
 			continue
 
 		case MYSQL_TYPE_DOUBLE:
-			data[i] = math.Float64frombits(binary.LittleEndian.Uint64(p[pos : pos+8]))
+			data[i] = ParseBinaryFloat64(p[pos : pos+4])
 			pos += 8
 			continue
 
@@ -146,7 +152,7 @@ func (p RowData) ParseBinary(f []*Field) ([]interface{}, error) {
 			v, isNull, n, err = LengthEnodedString(p[pos:])
 			pos += n
 			if err != nil {
-				return nil, err
+				return nil, errors.Trace(err)
 			}
 
 			if !isNull {
@@ -171,7 +177,7 @@ func (p RowData) ParseBinary(f []*Field) ([]interface{}, error) {
 			pos += int(num)
 
 			if err != nil {
-				return nil, err
+				return nil, errors.Trace(err)
 			}
 
 		case MYSQL_TYPE_TIMESTAMP, MYSQL_TYPE_DATETIME:
@@ -189,7 +195,7 @@ func (p RowData) ParseBinary(f []*Field) ([]interface{}, error) {
 			pos += int(num)
 
 			if err != nil {
-				return nil, err
+				return nil, errors.Trace(err)
 			}
 
 		case MYSQL_TYPE_TIME:
@@ -207,11 +213,11 @@ func (p RowData) ParseBinary(f []*Field) ([]interface{}, error) {
 			pos += int(num)
 
 			if err != nil {
-				return nil, err
+				return nil, errors.Trace(err)
 			}
 
 		default:
-			return nil, fmt.Errorf("Stmt Unknown FieldType %d %s", f[i].Type, f[i].Name)
+			return nil, errors.Errorf("Stmt Unknown FieldType %d %s", f[i].Type, f[i].Name)
 		}
 	}
 
@@ -236,11 +242,11 @@ func (r *Resultset) ColumnNumber() int {
 
 func (r *Resultset) GetValue(row, column int) (interface{}, error) {
 	if row >= len(r.Values) || row < 0 {
-		return nil, fmt.Errorf("invalid row index %d", row)
+		return nil, errors.Errorf("invalid row index %d", row)
 	}
 
 	if column >= len(r.Fields) || column < 0 {
-		return nil, fmt.Errorf("invalid column index %d", column)
+		return nil, errors.Errorf("invalid column index %d", column)
 	}
 
 	return r.Values[row][column], nil
@@ -250,13 +256,13 @@ func (r *Resultset) NameIndex(name string) (int, error) {
 	if column, ok := r.FieldNames[name]; ok {
 		return column, nil
 	} else {
-		return 0, fmt.Errorf("invalid field name %s", name)
+		return 0, errors.Errorf("invalid field name %s", name)
 	}
 }
 
 func (r *Resultset) GetValueByName(row int, name string) (interface{}, error) {
 	if column, err := r.NameIndex(name); err != nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	} else {
 		return r.GetValue(row, column)
 	}
@@ -299,7 +305,7 @@ func (r *Resultset) GetUint(row, column int) (uint64, error) {
 	case nil:
 		return 0, nil
 	default:
-		return 0, fmt.Errorf("data type is %T", v)
+		return 0, errors.Errorf("data type is %T", v)
 	}
 }
 
@@ -349,7 +355,7 @@ func (r *Resultset) GetFloat(row, column int) (float64, error) {
 	case nil:
 		return 0, nil
 	default:
-		return 0, fmt.Errorf("data type is %T", v)
+		return 0, errors.Errorf("data type is %T", v)
 	}
 }
 
@@ -381,7 +387,7 @@ func (r *Resultset) GetString(row, column int) (string, error) {
 	case nil:
 		return "", nil
 	default:
-		return "", fmt.Errorf("data type is %T", v)
+		return "", errors.Errorf("data type is %T", v)
 	}
 }
 
