@@ -7,10 +7,13 @@ import (
 
 	"github.com/juju/errors"
 	"../go-mysql/canal"
-
-	"github.com/siddontang/go-mysql-elasticsearch/elastic"
+	"../aerospike"
 	"github.com/siddontang/go/log"
 )
+
+type MQInterface interface {
+	SendMessage(msgBody string,timestamp int64) error
+}
 
 // In Elasticsearch, river is a pluggable service within Elasticsearch pulling data then indexing it into Elasticsearch.
 // We use this definition here too, although it may not run within Elasticsearch.
@@ -25,8 +28,8 @@ type River struct {
 	quit chan struct{}
 	wg   sync.WaitGroup
 
-	es *elastic.Client
-
+	as *AeroSpike.Client
+	mqService MQInterface
 	st *stat
 }
 
@@ -48,6 +51,7 @@ func NewRiver(c *Config) (*River, error) {
 		return nil, errors.Trace(err)
 	}
 
+
 	if err = r.prepareCanal(); err != nil {
 		return nil, errors.Trace(err)
 	}
@@ -57,7 +61,16 @@ func NewRiver(c *Config) (*River, error) {
 		return nil, errors.Trace(err)
 	}
 
-	r.es = elastic.NewClient(r.c.ESAddr)
+	r.as,err = AeroSpike.NewAeroSpike(r.c.ASConfig[0])
+	if err != nil {
+		return nil,errors.Trace(err)
+	}
+	mqConfig:=r.c.Mq
+	if mqConfig.UseRabbitMq{
+		r.mqService = NewRabbitMqService(mqConfig)
+	}else {
+		r.mqService = NewMqService(mqConfig)
+	}
 
 	r.st = &stat{r: r}
 	go r.st.Run(r.c.StatAddr)
@@ -173,6 +186,7 @@ func (r *River) parseSource() (map[string][]string, error) {
 	return wildTables, nil
 }
 
+
 func (r *River) prepareRule() error {
 	wildtables, err := r.parseSource()
 	if err != nil {
@@ -205,6 +219,11 @@ func (r *River) prepareRule() error {
 					rr.Type = rule.Type
 					rr.Parent = rule.Parent
 					rr.FieldMapping = rule.FieldMapping
+					rr.Ids = rule.Ids
+					rr.EquivIds = rule.EquivIds
+					rr.FilteredFields = rule.FilteredFields
+					rr.FilteredFieldSet = rule.FilteredFieldSet
+					rr.MappingType = rule.MappingType
 				}
 			} else {
 				key := ruleKey(rule.Schema, rule.Table)

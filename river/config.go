@@ -5,12 +5,26 @@ import (
 
 	"github.com/BurntSushi/toml"
 	"github.com/juju/errors"
+	"../aerospike"
 )
+
+type MQConfig struct{
+	UseRabbitMq bool `toml:"useRabbitMq"`
+	Url string `toml:"mqUrl"`
+	AccessKey string `toml:"mqAccessKey"`
+	SecretKey string `toml:"mqSecretKey"`
+	ProducerId string `toml:"mqProducerId"`
+	Topic	   string `toml:"mqTopic"`
+	RabbitMqKey string `toml:"rabbitMqKey"`
+	RabbitMqExchange string `toml:"rabbitMqExchange"`
+	RabbitMqQueue string `toml:"rabbitMqQueue"`
+}
 
 type SourceConfig struct {
 	Schema string   `toml:"schema"`
 	Tables []string `toml:"tables"`
 }
+
 
 type Config struct {
 	MyAddr     string `toml:"my_addr"`
@@ -29,7 +43,10 @@ type Config struct {
 
 	Sources []SourceConfig `toml:"source"`
 
+	ASConfig []*AeroSpike.AeroSpikeConfig `toml:"aerospike"`
+
 	Rules []*Rule `toml:"rule"`
+	Mq *MQConfig  `toml:"messagequeue"`
 }
 
 func NewConfigWithFile(name string) (*Config, error) {
